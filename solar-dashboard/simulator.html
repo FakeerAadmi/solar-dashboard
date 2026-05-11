@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Battery Simulator — Nashik Solar Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Exo+2:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    /* Simulator-specific styles */
+    .page-header {
+      padding: calc(var(--nav-h) + 48px) 32px 48px;
+      max-width:1280px;
+      margin:0 auto;
+    }
+
+    .sim-wrapper {
+      max-width:1280px;
+      margin:0 auto;
+      padding:0 32px 80px;
+    }
+
+    /* ── Panel styles ─────────────────────── */
+    .sim-panel {
+      background:var(--bg-card);
+      border:1px solid var(--border);
+      border-radius:var(--r-lg);
+      padding:32px;
+      position:sticky;
+      top:calc(var(--nav-h) + 16px);
+    }
+
+    .sim-panel-title {
+      font-family:var(--font-display);
+      font-size:12px;
+      letter-spacing:3px;
+      text-transform:uppercase;
+      color:var(--text-muted);
+      margin-bottom:20px;
+    }
+
+    /* Battery size presets */
+    .battery-presets {
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+      margin-bottom:20px;
+    }
+
+    .preset-btn {
+      background:var(--bg-surface);
+      border:1px solid var(--border);
+      border-radius:var(--r);
+      padding:14px 10px;
+      cursor:pointer;
+      text-align:center;
+      transition:all 0.25s;
+      position:relative;
+    }
+
+    .preset-btn:hover {
+      border-color:rgba(16,185,129,0.4);
+      background:rgba(16,185,129,0.05);
+    }
+
+    .preset-btn.active {
+      border-color:var(--battery-c);
+      background:rgba(16,185,129,0.08);
+      box-shadow:0 0 24px rgba(16,185,129,0.15);
+    }
+
+    .pb-kwh {
+      font-family:var(--font-display);
+      font-size:22px;
+      font-weight:700;
+      color:var(--battery-c);
+      display:block;
+      line-height:1;
+    }
+
+    .preset-btn.active .pb-kwh { text-shadow:0 0 20px var(--battery-glow); }
+
+    .pb-label {
+      font-size:10px;
+      color:var(--text-muted);
+      display:block;
+      margin-top:3px;
+      letter-spacing:1px;
+      text-transform:uppercase;
+    }
+
+    .pb-price {
+      font-size:11px;
+      color:var(--text-secondary);
+      display:block;
+      margin-top:4px;
+      font-family:var(--font-mono);
+    }
+
+    .pb-badge {
+      position:absolute;
+      top:-9px; right:-9px;
+      background:var(--solar);
+      color:#000;
+      font-size:8px;
+      font-weight:700;
+      padding:2px 6px;
+      border-radius:4px;
+      letter-spacing:1px;
+      text-transform:uppercase;
+    }
+
+    .pb-over {
+      position:absolute;
+      top:-9px; right:-9px;
+      background:rgba(239,68,68,0.8);
+      color:#fff;
+      font-size:8px;
+      font-weight:700;
+      padding:2px 6px;
+      border-radius:4px;
+      letter-spacing:1px;
+    }
+
+    /* Slider */
+    .slider-wrap { margin-bottom:24px; }
+
+    .slider-header {
+      display:flex;
+      justify-content:space-between;
+      align-items:baseline;
+      margin-bottom:10px;
+    }
+
+    .slider-header span:first-child {
+      font-size:12px;
+      color:var(--text-muted);
+      letter-spacing:1px;
+      text-transform:uppercase;
+    }
+
+    .slider-header .slider-val {
+      font-family:var(--font-display);
+      font-size:20px;
+      font-weight:700;
+      color:var(--battery-c);
+    }
+
+    /* Context inputs */
+    .context-row {
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+      margin-bottom:20px;
+    }
+
+    .ctx-input {
+      background:var(--bg-surface);
+      border:1px solid var(--border);
+      border-radius:8px;
+      padding:10px 12px;
+    }
+
+    .ctx-input label {
+      display:block;
+      font-size:10px;
+      color:var(--text-muted);
+      letter-spacing:1px;
+      text-transform:uppercase;
+      margin-bottom:4px;
+    }
+
+    .ctx-input input {
+      background:transparent;
+      border:none;
+      outline:none;
+      color:var(--text-primary);
+      font-family:var(--font-mono);
+      font-size:14px;
+      width:100%;
+    }
+
+    /* ── Results section ─────────────────── */
+    .results-header {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom:24px;
+      flex-wrap:wrap;
+      gap:12px;
+    }
+
+    .results-battery-tag {
+      display:flex;
+      align-items:center;
+      gap:12px;
+    }
+
+    .bat-size-display {
+      font-family:var(--font-display);
+      font-size:32px;
+      font-weight:900;
+      color:var(--battery-c);
+      text-shadow:0 0 24px var(--battery-glow);
+    }
+
+    .bat-size-display span {
+      font-size:16px;
+      font-weight:400;
+      color:var(--text-secondary);
+    }
+
+    /* Result metric grid */
+    .metrics-grid {
+      display:grid;
+      grid-template-columns:repeat(3, 1fr);
+      gap:16px;
+      margin-bottom:24px;
+    }
+
+    @media(max-width:1100px) { .metrics-grid { grid-template-columns:repeat(2,1fr); } }
+    @media(max-width:640px)  { .metrics-grid { grid-template-columns:1fr 1fr; } }
+
+    .metric-card {
+      background:var(--bg-card);
+      border:1px solid var(--border);
+      border-radius:var(--r);
+      padding:20px;
+      position:relative;
+      overflow:hidden;
+      transition:all 0.3s;
+    }
+
+    .metric-card:hover {
+      border-color:var(--border-bright);
+      transform:translateY(-2px);
+    }
+
+    .metric-card::before {
+      content:'';
+      position:absolute;
+      top:0;left:0;right:0;
+      height:2px;
+      background:var(--mc-color, var(--solar));
+    }
+
+    .mc-icon { font-size:20px; margin-bottom:10px; display:block; }
+    .mc-label {
+      font-size:10px;
+      letter-spacing:2px;
+      text-transform:uppercase;
+      color:var(--text-muted);
+      margin-bottom:8px;
+    }
+    .mc-value {
+      font-family:var(--font-display);
+      font-size:clamp(20px,2.5vw,28px);
+      font-weight:700;
+      line-height:1;
+      color:var(--mc-color, var(--solar));
+    }
+    .mc-sub {
+      font-size:11px;
+      color:var(--text-muted);
+      margin-top:6px;
+      line-height:1.5;
+    }
+
+    /* ── Charging Timeline ────────────────── */
+    .timeline-card {
+      background:var(--bg-card);
+      border:1px solid var(--border);
+      border-radius:var(--r-lg);
+      padding:28px;
+      margin-bottom:24px;
+    }
+
+    .tl-title {
+      font-family:var(--font-display);
+      font-size:12px;
+      letter-spacing:2px;
+      text-transform:uppercase;
+      color:var(--text-muted);
+      margin-bottom:20px;
+    }
+
+    .tl-hours {
+      display:flex;
+      justify-content:space-between;
+      font-size:9px;
+      color:var(--text-muted);
+      font-family:var(--font-mono);
+      margin-bottom:6px;
+    }
+
+    .tl-track {
+      height:44px;
+      border-radius:8px;
+      overflow:hidden;
+      display:flex;
+      border:1px solid var(--border);
+    }
+
+    .tl-seg {
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:10px;
+      font-weight:600;
+      letter-spacing:0.5px;
+      overflow:hidden;
+      white-space:nowrap;
+      transition:flex 0.7s cubic-bezier(0.4,0,0.2,1);
+      min-width:0;
+    }
+
+    .tl-night  { background:rgba(15,25,41,0.9); color:var(--text-muted); }
+    .tl-solar  { background:linear-gradient(135deg,#d97706,#f59e0b); color:#000; font-weight:700; }
+    .tl-charge { background:linear-gradient(135deg,#059669,#10b981); color:#fff; font-weight:700; }
+    .tl-full   { background:rgba(16,185,129,0.15); color:var(--battery-c); border:none; }
+    .tl-grid   { background:linear-gradient(135deg,#1d4ed8,#3b82f6); color:#fff; font-weight:700; }
+
+    .tl-legend {
+      display:flex;
+      gap:20px;
+      flex-wrap:wrap;
+      margin-top:14px;
+    }
+
+    .tl-leg-item {
+      display:flex;
+      align-items:center;
+      gap:6px;
+      font-size:11px;
+      color:var(--text-secondary);
+    }
+
+    .tl-leg-dot {
+      width:10px;height:10px;
+      border-radius:2px;
+      flex-shrink:0;
+    }
+
+    /* ── Comparison table ─────────────────── */
+    .compare-wrap {
+      background:var(--bg-card);
+      border:1px solid var(--border);
+      border-radius:var(--r-lg);
+      overflow:hidden;
+      margin-bottom:24px;
+    }
+
+    .compare-header {
+      padding:20px 24px;
+      border-bottom:1px solid var(--border);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+    }
+
+    .compare-header h3 {
+      font-family:var(--font-display);
+      font-size:13px;
+      letter-spacing:2px;
+      text-transform:uppercase;
+      color:var(--text-secondary);
+    }
+
+    table.cmp-table {
+      width:100%;
+      border-collapse:collapse;
+    }
+
+    .cmp-table th {
+      padding:12px 18px;
+      text-align:left;
+      font-size:10px;
+      letter-spacing:2px;
+      text-transform:uppercase;
+      color:var(--text-muted);
+      background:rgba(15,25,41,0.5);
+      border-bottom:1px solid var(--border);
+      white-space:nowrap;
+    }
+
+    .cmp-table td {
+      padding:14px 18px;
+      border-bottom:1px solid var(--border);
+      font-size:13px;
+      white-space:nowrap;
+      transition:background 0.2s;
+    }
+
+    .cmp-table tr:last-child td { border-bottom:none; }
+
+    .cmp-table tr.cmp-active td {
+      background:rgba(16,185,129,0.05);
+    }
+
+    .cmp-table tr.cmp-active td:first-child {
+      border-left:3px solid var(--battery-c);
+    }
+
+    .cmp-table tr:hover td { background:rgba(148,163,184,0.04); }
+
+    .cmp-num {
+      font-family:var(--font-mono);
+      font-size:14px;
+    }
+
+    .tag-rec {
+      display:inline-block;
+      background:var(--battery-c);
+      color:#000;
+      font-size:8px;
+      font-weight:700;
+      padding:2px 6px;
+      border-radius:3px;
+      letter-spacing:1px;
+      margin-left:6px;
+      vertical-align:middle;
+    }
+
+    .tag-ob {
+      display:inline-block;
+      background:rgba(239,68,68,0.12);
+      color:#fca5a5;
+      border:1px solid rgba(239,68,68,0.3);
+      font-size:8px;
+      font-weight:700;
+      padding:2px 6px;
+      border-radius:3px;
+      letter-spacing:1px;
+      margin-left:6px;
+      vertical-align:middle;
+    }
+
+    /* ── Advice box ─────────────────────── */
+    .advice-box {
+      background:linear-gradient(135deg,rgba(16,185,129,0.06),transparent);
+      border:1px solid rgba(16,185,129,0.25);
+      border-radius:var(--r-lg);
+      padding:28px;
+      margin-bottom:24px;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .advice-box::before {
+      content:'';
+      position:absolute;
+      top:0;left:0;width:4px;bottom:0;
+      background:var(--battery-c);
+    }
+
+    .advice-title {
+      font-family:var(--font-display);
+      font-size:13px;
+      letter-spacing:2px;
+      text-transform:uppercase;
+      color:var(--battery-c);
+      margin-bottom:14px;
+    }
+
+    .advice-content {
+      font-size:14px;
+      color:var(--text-secondary);
+      line-height:1.8;
+    }
+
+    .advice-content strong { color:var(--text-primary); }
+
+    /* ── Savings chart ─────────────────── */
+    .savings-chart-wrap {
+      background:var(--bg-card);
+      border:1px solid var(--border);
+      border-radius:var(--r-lg);
+      padding:28px;
+      margin-bottom:24px;
+    }
+
+    .sc-header {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-bottom:20px;
+      flex-wrap:wrap;
+      gap:10px;
+    }
+
+    .sc-title {
+      font-family:var(--font-display);
+      font-size:13px;
+      letter-spacing:2px;
+      text-transform:uppercase;
+      color:var(--text-secondary);
+    }
+
+    /* Brand options */
+    .brands-row {
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-top:16px;
+    }
+
+    .brand-tag {
+      background:var(--bg-surface);
+      border:1px solid var(--border);
+      border-radius:6px;
+      padding:6px 12px;
+      font-size:12px;
+      color:var(--text-secondary);
+      font-family:var(--font-mono);
+      white-space:nowrap;
+    }
+
+    /* Grid independence visual */
+    .independence-visual {
+      display:flex;
+      align-items:center;
+      gap:24px;
+      padding:20px;
+      background:var(--bg-surface);
+      border-radius:var(--r);
+      border:1px solid var(--border);
+      margin-bottom:16px;
+      flex-wrap:wrap;
+    }
+
+    .iv-before, .iv-after {
+      flex:1;
+      min-width:120px;
+      text-align:center;
+    }
+
+    .iv-label {
+      font-size:10px;
+      letter-spacing:2px;
+      text-transform:uppercase;
+      color:var(--text-muted);
+      margin-bottom:8px;
+    }
+
+    .iv-pct {
+      font-family:var(--font-display);
+      font-size:36px;
+      font-weight:900;
+      line-height:1;
+    }
+
+    .iv-sub {
+      font-size:11px;
+      color:var(--text-muted);
+      margin-top:4px;
+    }
+
+    .iv-arrow {
+      font-size:28px;
+      color:var(--battery-c);
+      flex-shrink:0;
+    }
+
+    /* Responsive */
+    @media(max-width:900px){
+      .sim-panel { position:static; }
+    }
+    @media(max-width:768px){
+      .page-header { padding: calc(var(--nav-h) + 24px) 16px 24px; }
+      .sim-wrapper { padding:0 16px 60px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════ NAVBAR ══════════════ -->
+<nav class="navbar">
+  <a href="index.html" class="nav-brand">
+    <div class="brand-icon">☀️</div>
+    <div>
+      <div class="brand-name">SolarHome</div>
+      <div class="brand-sub">Nashik · 5 kW System</div>
+    </div>
+  </a>
+  <ul class="nav-links">
+    <li><a href="index.html">Dashboard</a></li>
+    <li><a href="simulator.html" class="active">Battery Sim</a></li>
+  </ul>
+  <div class="nav-badge">
+    <span class="dot"></span>
+    <span>Battery Simulator</span>
+  </div>
+</nav>
+
+<!-- ══════════════ PAGE HEADER ══════════════ -->
+<div class="page-header">
+  <span style="font-family:var(--font-mono);font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--solar)">// Battery Simulator</span>
+  <h1 style="font-family:var(--font-display);font-size:clamp(26px,4vw,48px);font-weight:900;margin:12px 0 10px;line-height:1.1">
+    Add a <span style="color:var(--battery-c)">Battery</span><br>to Your System
+  </h1>
+  <p style="color:var(--text-secondary);font-size:15px;max-width:580px">
+    Select any battery size and instantly see how it changes your charging cycles, backup hours, savings, grid dependency, and exact breakeven — all calculated for your Nashik 5kW setup.
+  </p>
+</div>
+
+<!-- ══════════════ MAIN LAYOUT ══════════════ -->
+<div class="sim-wrapper">
+  <div class="sim-layout">
+
+    <!-- ════ LEFT PANEL: Inputs ════ -->
+    <aside class="sim-panel">
+      <div class="sim-panel-title">// Select Battery Size</div>
+
+      <!-- Preset buttons -->
+      <div class="battery-presets">
+        <button class="preset-btn" data-kwh="2.4" onclick="selectBattery(2.4,this)">
+          <span class="pb-kwh">2.4</span>
+          <span class="pb-label">kWh · 50Ah</span>
+          <span class="pb-price">₹35K–45K</span>
+        </button>
+        <button class="preset-btn active" data-kwh="4.8" onclick="selectBattery(4.8,this)">
+          <span class="pb-kwh">4.8</span>
+          <span class="pb-label">kWh · 100Ah</span>
+          <span class="pb-price">₹65K–85K</span>
+          <span class="pb-badge">Best Pick</span>
+        </button>
+        <button class="preset-btn" data-kwh="7.2" onclick="selectBattery(7.2,this)">
+          <span class="pb-kwh">7.2</span>
+          <span class="pb-label">kWh · 150Ah</span>
+          <span class="pb-price">₹95K–1.1L</span>
+          <span class="pb-over">Over Budget</span>
+        </button>
+        <button class="preset-btn" data-kwh="9.6" onclick="selectBattery(9.6,this)">
+          <span class="pb-kwh">9.6</span>
+          <span class="pb-label">kWh · 200Ah</span>
+          <span class="pb-price">₹1.25L–1.55L</span>
+          <span class="pb-over">Over Budget</span>
+        </button>
+      </div>
+
+      <!-- Slider for custom -->
+      <div class="slider-wrap">
+        <div class="slider-header">
+          <span>Custom Capacity</span>
+          <span class="slider-val"><span id="slider-display">4.8</span> kWh</span>
+        </div>
+        <input type="range" id="bat-slider" min="1" max="12" step="0.1" value="4.8"
+               oninput="onSliderChange(this.value)"
+               style="--val:32%">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);font-family:var(--font-mono);margin-top:4px">
+          <span>1 kWh</span><span>12 kWh</span>
+        </div>
+      </div>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
+
+      <!-- Context inputs (editable) -->
+      <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px">// Adjust Your Numbers</div>
+      <div class="context-row">
+        <div class="ctx-input">
+          <label>Daily Gen (kWh)</label>
+          <input type="number" id="inp-gen" value="20.8" step="0.5" min="5" max="30" onchange="refreshAll()">
+        </div>
+        <div class="ctx-input">
+          <label>Daily Use (kWh)</label>
+          <input type="number" id="inp-cons" value="13" step="0.5" min="5" max="30" onchange="refreshAll()">
+        </div>
+        <div class="ctx-input">
+          <label>Grid ₹/unit</label>
+          <input type="number" id="inp-tariff" value="9" step="0.5" min="5" max="15" onchange="refreshAll()">
+        </div>
+        <div class="ctx-input">
+          <label>Export ₹/unit</label>
+          <input type="number" id="inp-export" value="2.8" step="0.1" min="1" max="10" onchange="refreshAll()">
+        </div>
+      </div>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
+
+      <!-- Quick summary -->
+      <div style="font-size:11px;color:var(--text-muted);line-height:1.8">
+        <div>⚡ Inverter battery port: <strong style="color:var(--text-secondary)">3 kW max</strong></div>
+        <div>🔋 Chemistry: <strong style="color:var(--battery-c)">LiFePO4 · 48V</strong></div>
+        <div>📉 Usable DoD: <strong style="color:var(--text-secondary)">80% of rated capacity</strong></div>
+        <div>♻️ Cycle life: <strong style="color:var(--text-secondary)">~3,500 cycles (~9.5 years)</strong></div>
+      </div>
+    </aside>
+
+    <!-- ════ RIGHT PANEL: Results ════ -->
+    <div>
+      <!-- Results header -->
+      <div class="results-header">
+        <div class="results-battery-tag">
+          <div>
+            <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted)">Selected Battery</div>
+            <div class="bat-size-display"><span id="res-kwh">4.8</span> <span>kWh LiFePO4</span></div>
+          </div>
+          <div id="res-badge" class="badge badge-battery" style="margin-left:8px">Recommended</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;color:var(--text-muted)">Estimated Cost</div>
+          <div style="font-family:var(--font-display);font-size:22px;font-weight:700;color:var(--solar)" id="res-price">₹75,000</div>
+        </div>
+      </div>
+
+      <!-- Grid Independence Visual -->
+      <div class="independence-visual">
+        <div class="iv-before">
+          <div class="iv-label">Grid Dependency Now</div>
+          <div class="iv-pct" style="color:var(--grid-c)" id="ind-before">58%</div>
+          <div class="iv-sub">without battery</div>
+        </div>
+        <div class="iv-arrow">→</div>
+        <div class="iv-after">
+          <div class="iv-label">With This Battery</div>
+          <div class="iv-pct" style="color:var(--battery-c)" id="ind-after">29%</div>
+          <div class="iv-sub" id="ind-reduction">−29% grid dependency</div>
+        </div>
+        <div class="iv-arrow">→</div>
+        <div class="iv-after">
+          <div class="iv-label">Self-Sufficiency</div>
+          <div class="iv-pct" style="color:var(--solar)" id="ind-self">71%</div>
+          <div class="iv-sub">of your needs met by solar</div>
+        </div>
+      </div>
+
+      <!-- 6 key metrics -->
+      <div class="metrics-grid">
+        <div class="metric-card" style="--mc-color:var(--battery-c)">
+          <span class="mc-icon">⏱️</span>
+          <div class="mc-label">Backup Duration</div>
+          <div class="mc-value" id="m-backup">5.0 hrs</div>
+          <div class="mc-sub" id="m-backup-sub">at avg load · peak evening ~<span id="m-backup-peak">4.2</span> hrs</div>
+        </div>
+
+        <div class="metric-card" style="--mc-color:var(--solar)">
+          <span class="mc-icon">⚡</span>
+          <div class="mc-label">Daily Charging Time</div>
+          <div class="mc-value" id="m-charge">2.5 hrs</div>
+          <div class="mc-sub" id="m-charge-sub">from solar surplus at <span id="m-charge-rate">1.9</span> kW avg</div>
+        </div>
+
+        <div class="metric-card" style="--mc-color:var(--export-c)">
+          <span class="mc-icon">💰</span>
+          <div class="mc-label">Daily Net Savings</div>
+          <div class="mc-value" id="m-daily-save">₹23.8</div>
+          <div class="mc-sub">vs exporting surplus @ ₹2.8/unit</div>
+        </div>
+
+        <div class="metric-card" style="--mc-color:var(--solar)">
+          <span class="mc-icon">📅</span>
+          <div class="mc-label">Annual Savings</div>
+          <div class="mc-value" id="m-annual-save">₹8,700</div>
+          <div class="mc-sub" id="m-monthly-save">≈ ₹725/month</div>
+        </div>
+
+        <div class="metric-card" style="--mc-color:var(--battery-c)">
+          <span class="mc-icon">📈</span>
+          <div class="mc-label">Breakeven</div>
+          <div class="mc-value" id="m-breakeven">8.6 yrs</div>
+          <div class="mc-sub" id="m-lifetime-save">Lifetime saving: ₹82K</div>
+        </div>
+
+        <div class="metric-card" style="--mc-color:var(--grid-c)">
+          <span class="mc-icon">🔌</span>
+          <div class="mc-label">Daily Grid Import</div>
+          <div class="mc-value" id="m-grid-import">3.7 kWh</div>
+          <div class="mc-sub" id="m-grid-sub">vs 7.5 kWh without battery</div>
+        </div>
+      </div>
+
+      <!-- Charging Timeline -->
+      <div class="timeline-card">
+        <div class="tl-title">// Daily Energy Timeline (24 Hours)</div>
+        <div class="tl-hours" id="tl-hours-label">
+          <span>12 AM</span><span>4 AM</span><span>8 AM</span><span>12 PM</span><span>4 PM</span><span>8 PM</span><span>12 AM</span>
+        </div>
+        <div class="tl-track" id="tl-track"></div>
+        <div class="tl-legend">
+          <div class="tl-leg-item"><div class="tl-leg-dot" style="background:linear-gradient(135deg,#d97706,#f59e0b)"></div>Solar direct use</div>
+          <div class="tl-leg-item"><div class="tl-leg-dot" style="background:linear-gradient(135deg,#059669,#10b981)"></div>Battery charging</div>
+          <div class="tl-leg-item"><div class="tl-leg-dot" style="background:rgba(16,185,129,0.15);border:1px solid #10b981"></div>Battery full / exporting</div>
+          <div class="tl-leg-item"><div class="tl-leg-dot" style="background:linear-gradient(135deg,#1d4ed8,#3b82f6)"></div>Battery discharging</div>
+          <div class="tl-leg-item"><div class="tl-leg-dot" style="background:rgba(15,25,41,0.9);border:1px solid var(--border)"></div>Night (grid / idle)</div>
+        </div>
+      </div>
+
+      <!-- Savings cashflow chart -->
+      <div class="savings-chart-wrap">
+        <div class="sc-header">
+          <div class="sc-title">// 10-Year Cumulative Savings (Battery Only)</div>
+        </div>
+        <div style="height:220px">
+          <canvas id="savingsChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Full comparison table -->
+      <div class="compare-wrap">
+        <div class="compare-header">
+          <h3>// All Battery Options — Side by Side</h3>
+          <span style="font-size:11px;color:var(--text-muted)">Your budget: <strong style="color:var(--solar)">Under ₹1 Lakh</strong></span>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="cmp-table" id="compare-table">
+            <thead>
+              <tr>
+                <th>Capacity</th>
+                <th>Usable kWh</th>
+                <th>Est. Price</th>
+                <th>Backup (avg)</th>
+                <th>Charge Time</th>
+                <th>Annual Saving</th>
+                <th>Breakeven</th>
+                <th>Grid ↓</th>
+              </tr>
+            </thead>
+            <tbody id="compare-tbody">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Advice box -->
+      <div class="advice-box">
+        <div class="advice-title">// My Recommendation & Honest Analysis</div>
+        <div class="advice-content" id="advice-text">
+          Loading advice...
+        </div>
+      </div>
+
+      <!-- Compatible brands -->
+      <div class="timeline-card">
+        <div class="tl-title">// Compatible LiFePO4 Brands (48V System)</div>
+        <div style="font-size:13px;color:var(--text-secondary);margin-bottom:16px" id="brands-text">
+          For your Havells Enviro GTi Hybrid (48V, 3kW battery port):
+        </div>
+        <div class="brands-row" id="brands-row"></div>
+        <div style="margin-top:16px;font-size:12px;color:var(--text-muted);line-height:1.8">
+          ⚠️ <strong style="color:var(--text-secondary)">Before buying:</strong> Confirm CAN bus or RS485 compatibility with Havells Enviro GTi.
+          Most standard 48V LiFePO4 packs work in "dumb mode" (no BMS communication) — the inverter will still charge/discharge correctly using voltage thresholds.
+          For smart BMS monitoring, ask your vendor for Havells GTi protocol compatibility.
+        </div>
+      </div>
+
+    </div><!-- /right panel -->
+  </div><!-- /sim-layout -->
+</div><!-- /sim-wrapper -->
+
+<!-- Footer -->
+<footer class="footer">
+  <p>⚡ <strong>Nashik Home Solar</strong> Battery Simulator · Based on Solarman data + Nashik irradiance · Calculations are estimates</p>
+  <p style="margin-top:6px"><a href="index.html">← Back to Dashboard</a></p>
+</footer>
+
+<!-- Scripts -->
+<script src="js/data.js"></script>
+<script src="js/calculations.js"></script>
+<script>
+// ─────────────────────────────────────────────
+//  State
+// ─────────────────────────────────────────────
+let currentKwh  = 4.8;
+let savingsChart = null;
+
+// ─────────────────────────────────────────────
+//  Entry
+// ─────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  buildCompareTable();
+  renderAll(4.8);
+});
+
+// ─────────────────────────────────────────────
+//  Preset button selection
+// ─────────────────────────────────────────────
+function selectBattery(kwh, btn) {
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentKwh = kwh;
+  document.getElementById('bat-slider').value = kwh;
+  updateSliderFill(kwh);
+  document.getElementById('slider-display').textContent = kwh.toFixed(1);
+  renderAll(kwh);
+}
+
+// ─────────────────────────────────────────────
+//  Slider change
+// ─────────────────────────────────────────────
+function onSliderChange(val) {
+  val = parseFloat(val);
+  currentKwh = val;
+  document.getElementById('slider-display').textContent = val.toFixed(1);
+  updateSliderFill(val);
+  // Deactivate presets unless matches
+  document.querySelectorAll('.preset-btn').forEach(b => {
+    b.classList.toggle('active', parseFloat(b.dataset.kwh) === val);
+  });
+  renderAll(val);
+}
+
+function updateSliderFill(val) {
+  const pct = ((val - 1) / 11) * 100;
+  document.getElementById('bat-slider').style.setProperty('--val', pct + '%');
+}
+
+// ─────────────────────────────────────────────
+//  Input fields changed
+// ─────────────────────────────────────────────
+function refreshAll() { renderAll(currentKwh); }
+
+function getInputs() {
+  return {
+    gen:    parseFloat(document.getElementById('inp-gen').value)    || 20.8,
+    cons:   parseFloat(document.getElementById('inp-cons').value)   || 13,
+    tariff: parseFloat(document.getElementById('inp-tariff').value) || 9,
+    export: parseFloat(document.getElementById('inp-export').value) || 2.8,
+  };
+}
+
+// ─────────────────────────────────────────────
+//  Main render function
+// ─────────────────────────────────────────────
+function renderAll(kwh) {
+  const inp = getInputs();
+  // Temporarily override SYSTEM constants for recalc
+  const origTariff = SYSTEM.grid_tariff_inr;
+  const origExport = SYSTEM.export_rate_inr;
+
+  // We'll pass adjusted values inline
+  const sim = calcBatteryCustom(kwh, inp);
+
+  // ── Header
+  document.getElementById('res-kwh').textContent   = kwh.toFixed(1);
+  document.getElementById('res-price').textContent = '₹' + Math.round(sim.price_mid / 1000) + 'K–₹' + Math.round(sim.price_max / 1000) + 'K';
+
+  const rec = SYSTEM.batteries.find(b => b.kwh === kwh);
+  const badge = document.getElementById('res-badge');
+  if(rec && rec.recommended) {
+    badge.textContent = '⭐ Recommended';
+    badge.className = 'badge badge-battery';
+    badge.style.display = 'inline-block';
+  } else if(rec && !rec.budget_ok) {
+    badge.textContent = '⚠ Over Budget';
+    badge.className = 'badge';
+    badge.style.cssText = 'background:rgba(239,68,68,0.12);color:#fca5a5;border:1px solid rgba(239,68,68,0.3);display:inline-block';
+  } else {
+    badge.textContent = 'In Budget';
+    badge.className = 'badge badge-grid';
+    badge.style.display = 'inline-block';
+  }
+
+  // ── Independence
+  document.getElementById('ind-before').textContent    = sim.old_grid_pct + '%';
+  document.getElementById('ind-after').textContent     = sim.new_grid_pct + '%';
+  document.getElementById('ind-reduction').textContent = '−' + sim.grid_reduction_pct + '% grid dependency';
+  document.getElementById('ind-self').textContent      = sim.new_self_pct + '%';
+
+  // ── Metric cards
+  document.getElementById('m-backup').textContent      = sim.backup_hours_avg.toFixed(1) + ' hrs';
+  document.getElementById('m-backup-peak').textContent = sim.backup_hours_peak.toFixed(1);
+  document.getElementById('m-charge').textContent      = sim.charge_time_hrs.toFixed(1) + ' hrs';
+  document.getElementById('m-charge-rate').textContent = sim.charge_rate_kw.toFixed(1);
+  document.getElementById('m-daily-save').textContent  = '₹' + Math.round(sim.daily_net_saving);
+  document.getElementById('m-annual-save').textContent = '₹' + Math.round(sim.annual_net_saving).toLocaleString('en-IN');
+  document.getElementById('m-monthly-save').textContent= '≈ ₹' + Math.round(sim.monthly_net_saving).toLocaleString('en-IN') + '/month';
+  document.getElementById('m-breakeven').textContent   = sim.fmt_breakeven;
+  document.getElementById('m-lifetime-save').textContent = 'Lifetime saving: ₹' + Math.round(sim.lifetime_saving/1000) + 'K';
+  document.getElementById('m-grid-import').textContent = sim.new_grid_import.toFixed(1) + ' kWh';
+  document.getElementById('m-grid-sub').textContent    = 'vs ' + sim.base_grid_import.toFixed(1) + ' kWh without battery';
+
+  // ── Timeline
+  renderTimeline(sim);
+
+  // ── Savings chart
+  renderSavingsChart(sim);
+
+  // ── Compare table highlight
+  document.querySelectorAll('.cmp-table tr').forEach(tr => {
+    tr.classList.toggle('cmp-active', parseFloat(tr.dataset.kwh) === kwh);
+  });
+
+  // ── Advice
+  renderAdvice(kwh, sim, inp);
+
+  // ── Brands
+  renderBrands(kwh);
+}
+
+// ─────────────────────────────────────────────
+//  Custom calc with input overrides
+// ─────────────────────────────────────────────
+function calcBatteryCustom(kwh, inp) {
+  const gen  = inp.gen;
+  const cons = inp.cons;
+  const sfrac = SYSTEM.solar_hour_fraction;
+
+  const daytime_load   = cons * sfrac;
+  const direct_solar   = Math.min(gen, daytime_load);
+  const surplus        = gen - direct_solar;
+  const night_load     = cons - direct_solar;
+
+  const bat = SYSTEM.batteries.find(b => b.kwh === kwh)
+           || { kwh, dod:0.80, cycles:3500, price_min:kwh*13000, price_max:kwh*16000, price_mid:kwh*14500, brands:[], budget_ok:kwh<=9, recommended:false };
+  const price_mid = bat.price_mid || kwh * 14500;
+  const price_max = bat.price_max || kwh * 16000;
+
+  const usable = kwh * (bat.dod || 0.80);
+  const max_inv_charge = SYSTEM.inverter_battery_port_kw * 4;
+  const battery_charged   = Math.min(usable, surplus, max_inv_charge);
+  const battery_discharge = Math.min(battery_charged, night_load);
+
+  const new_grid_import = night_load - battery_discharge;
+  const new_export      = surplus - battery_charged;
+
+  const daily_grid_saving = battery_discharge * inp.tariff;
+  const daily_export_loss = battery_charged * inp.export;
+  const daily_net_saving  = daily_grid_saving - daily_export_loss;
+  const annual_net_saving = daily_net_saving * 365;
+
+  const breakeven_yrs = price_mid / Math.max(annual_net_saving, 1);
+  const avg_load_kw   = cons / 24;
+  const backup_avg    = usable / avg_load_kw;
+  const ev_load_kw    = (night_load * 0.6) / 4;
+  const backup_peak   = usable / Math.max(ev_load_kw, 0.5);
+  const surplus_rate  = surplus / 6;
+  const charge_rate   = Math.min(SYSTEM.inverter_battery_port_kw, surplus_rate);
+  const charge_time   = usable / charge_rate;
+
+  const old_grid_pct = Math.round((night_load / cons) * 100);
+  const new_grid_pct = Math.round((new_grid_import / cons) * 100);
+  const new_self_pct = Math.min(Math.round(((direct_solar + battery_discharge) / cons) * 100), 100);
+  const lifetime_yrs = (bat.cycles || 3500) / 365;
+  const lifetime_saving = annual_net_saving * Math.min(lifetime_yrs, 12);
+
+  const fmt_breakeven = breakeven_yrs >= 1
+    ? breakeven_yrs.toFixed(1) + ' yrs'
+    : Math.round(breakeven_yrs * 12) + ' mo';
+
+  return {
+    kwh, usable,
+    battery_charged, battery_discharge,
+    new_grid_import, new_export,
+    direct_solar, surplus, night_load,
+    daily_net_saving, annual_net_saving,
+    monthly_net_saving: daily_net_saving * 30,
+    breakeven_yrs, lifetime_saving,
+    backup_hours_avg: Math.round(backup_avg*10)/10,
+    backup_hours_peak: Math.round(backup_peak*10)/10,
+    charge_time_hrs: Math.round(charge_time*10)/10,
+    charge_rate_kw: Math.round(charge_rate*10)/10,
+    old_grid_pct, new_grid_pct,
+    grid_reduction_pct: old_grid_pct - new_grid_pct,
+    new_self_pct,
+    fmt_breakeven,
+    price_mid, price_max,
+    base_grid_import: night_load,
+    bat,
+  };
+}
+
+// ─────────────────────────────────────────────
+//  Timeline render
+// ─────────────────────────────────────────────
+function renderTimeline(sim) {
+  const track = document.getElementById('tl-track');
+  // 24 segments = 24 hours, each 1hr wide expressed as flex
+  // Hours: 0–5 night, 6–7 dawn, 8–14 solar, 15–18 late solar/discharge, 19–23 night
+  // Timeline:
+  // 0-5   = night grid (6 hrs)
+  // 6-7   = solar starts, direct use (2 hrs)
+  // 8-13  = solar direct + battery charging (6 hrs, most surplus)
+  // 13-17 = solar still on but fading, battery full / exporting (4 hrs)
+  // 17-19 = battery discharge starts (2 hrs)
+  // 19-23 = night grid with battery or after depleted (5 hrs)
+  const chargeHrs = Math.min(sim.charge_time_hrs, 6);
+
+  const segments = [
+    { label:'Night',              flex:6,  cls:'tl-night',  tip:'Grid/idle (midnight–6am)' },
+    { label:'Dawn Solar',         flex:2,  cls:'tl-solar',  tip:'Solar starts, covers load' },
+    { label:'Solar + Charging',   flex:Math.round(chargeHrs), cls:'tl-charge', tip:`Battery charging (${sim.charge_time_hrs}h)` },
+    { label:'Full · Exporting',   flex:Math.round(6-chargeHrs+1), cls:'tl-full', tip:'Battery full, surplus to grid' },
+    { label:'Battery Discharge',  flex:Math.round(sim.backup_hours_peak), cls:'tl-grid', tip:`Battery powers home (${sim.backup_hours_peak}h)` },
+    { label:'Grid',               flex:Math.max(1,5-Math.round(sim.backup_hours_peak)), cls:'tl-night', tip:'Grid import if battery depleted' },
+  ];
+
+  // Normalize flex so total = 24
+  const totalFlex = segments.reduce((a,b) => a+b.flex, 0);
+  track.innerHTML = segments.map(s => {
+    const f = Math.max((s.flex / totalFlex) * 24, 0.5);
+    const showLabel = f > 1.5;
+    return `<div class="tl-seg ${s.cls}" style="flex:${f}" title="${s.tip}">${showLabel ? s.label : ''}</div>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────
+//  Savings chart
+// ─────────────────────────────────────────────
+function renderSavingsChart(sim) {
+  const ctx = document.getElementById('savingsChart').getContext('2d');
+  if(savingsChart) savingsChart.destroy();
+
+  const years  = [];
+  const values = [];
+  let cum = -sim.price_mid;
+  let ann = sim.annual_net_saving;
+
+  for(let i=0;i<=10;i++){
+    years.push('Yr ' + i);
+    values.push(Math.round(cum / 1000));
+    cum += ann;
+    ann *= (1 + SYSTEM.annual_tariff_hike);
+  }
+
+  savingsChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: years,
+      datasets: [{
+        label: 'Cumulative (₹K)',
+        data: values,
+        borderColor: values.map(v => v >= 0 ? '#10b981' : '#ef4444'),
+        segment: {
+          borderColor: ctx => ctx.p0.parsed.y < 0 && ctx.p1.parsed.y < 0 ? '#ef4444' :
+                              ctx.p0.parsed.y >= 0 ? '#10b981' : '#f59e0b',
+        },
+        backgroundColor: context => {
+          const {ctx:c, chartArea} = context.chart;
+          if(!chartArea) return 'transparent';
+          const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          g.addColorStop(0,'rgba(16,185,129,0.12)');
+          g.addColorStop(1,'rgba(239,68,68,0.08)');
+          return g;
+        },
+        fill: true,
+        tension: 0.4,
+        borderWidth: 2.5,
+        pointRadius: values.map(v => v >= 0 ? 5 : 4),
+        pointBackgroundColor: values.map(v => v >= 0 ? '#10b981' : '#ef4444'),
+        pointHoverRadius: 8,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0f1929',
+          borderColor: 'rgba(148,163,184,0.2)',
+          borderWidth: 1,
+          titleColor: '#f1f5f9',
+          bodyColor: '#94a3b8',
+          callbacks: {
+            label: ctx => {
+              const v = ctx.parsed.y;
+              return (v>=0 ? 'Net Profit: +₹' : 'Still in debt: ₹') + Math.abs(v) + 'K';
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color:'rgba(148,163,184,0.06)' },
+          ticks: { color:'#64748b', font:{ family:'Share Tech Mono', size:10 } }
+        },
+        y: {
+          grid: { color:'rgba(148,163,184,0.06)' },
+          ticks: {
+            color:'#64748b',
+            font:{ family:'Share Tech Mono', size:10 },
+            callback: v => (v>=0?'+':'')+'₹'+v+'K'
+          }
+        }
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+//  Comparison table
+// ─────────────────────────────────────────────
+function buildCompareTable() {
+  const inp = getInputs();
+  const tbody = document.getElementById('compare-tbody');
+  tbody.innerHTML = '';
+
+  SYSTEM.batteries.forEach(bat => {
+    const sim = calcBatteryCustom(bat.kwh, inp);
+    const tr = document.createElement('tr');
+    tr.dataset.kwh = bat.kwh;
+    if(bat.kwh === currentKwh) tr.classList.add('cmp-active');
+
+    const recTag  = bat.recommended  ? '<span class="tag-rec">Best</span>' : '';
+    const obTag   = !bat.budget_ok   ? '<span class="tag-ob">Over ₹1L</span>' : '';
+    const inBudget = bat.budget_ok ? '<span style="color:var(--battery-c)">✓</span>' : '<span style="color:#fca5a5">—</span>';
+
+    tr.innerHTML = `
+      <td>
+        <strong class="cmp-num" style="color:var(--battery-c)">${bat.kwh} kWh</strong>
+        ${recTag}${obTag}
+      </td>
+      <td class="cmp-num">${sim.usable.toFixed(2)} kWh</td>
+      <td class="cmp-num">₹${Math.round(bat.price_min/1000)}K–₹${Math.round(bat.price_max/1000)}K</td>
+      <td class="cmp-num">${sim.backup_hours_avg.toFixed(1)} hrs</td>
+      <td class="cmp-num">${sim.charge_time_hrs.toFixed(1)} hrs</td>
+      <td class="cmp-num" style="color:var(--battery-c)">₹${Math.round(sim.annual_net_saving/1000)}K/yr</td>
+      <td class="cmp-num">${sim.fmt_breakeven}</td>
+      <td class="cmp-num">−${sim.grid_reduction_pct}%</td>
+    `;
+
+    tr.addEventListener('click', () => {
+      currentKwh = bat.kwh;
+      document.getElementById('bat-slider').value = bat.kwh;
+      updateSliderFill(bat.kwh);
+      document.getElementById('slider-display').textContent = bat.kwh.toFixed(1);
+      document.querySelectorAll('.preset-btn').forEach(b => {
+        b.classList.toggle('active', parseFloat(b.dataset.kwh) === bat.kwh);
+      });
+      renderAll(bat.kwh);
+    });
+
+    tbody.appendChild(tr);
+  });
+}
+
+// ─────────────────────────────────────────────
+//  Advice text
+// ─────────────────────────────────────────────
+function renderAdvice(kwh, sim, inp) {
+  const el = document.getElementById('advice-text');
+  const payback = sim.breakeven_yrs.toFixed(1);
+  const annSave = Math.round(sim.annual_net_saving).toLocaleString('en-IN');
+  const backup  = sim.backup_hours_avg.toFixed(1);
+
+  let html = '';
+
+  if(kwh <= 2.4) {
+    html = `<p>A <strong>2.4 kWh battery</strong> is an affordable entry point at ₹35K–45K, but here's the honest reality for your setup: 
+    it only gives you <strong>${backup} hours</strong> of backup, which barely covers your occasional power cuts. 
+    More importantly, the <strong>annual saving of ₹${annSave}</strong> means a payback of <strong>${payback} years</strong> — 
+    and the battery will likely need replacement before you break even.</p>
+    <p>💡 <strong>Verdict:</strong> Skip this. Stretch to 4.8 kWh — the cost difference is ₹25–40K more, but the economics are far better and you'll actually feel the difference.</p>`;
+
+  } else if(kwh === 4.8) {
+    html = `<p>The <strong>4.8 kWh</strong> is genuinely the sweet spot for your system. Here's why: your surplus solar is ~${sim.surplus.toFixed(1)} kWh/day, 
+    and this battery absorbs <strong>${sim.battery_charged.toFixed(1)} kWh</strong> of that — storing units that would otherwise earn only ₹2.8 instead of saving ₹9.</p>
+    <p>You'll get <strong>${backup} hours of backup</strong> at average load — comfortably covering your occasional sub-1hr power cuts with plenty of headroom. 
+    The <strong>annual saving of ₹${annSave}</strong> gives a <strong>${payback}-year breakeven</strong>.</p>
+    <p>💡 <strong>Verdict:</strong> ⭐ This is the one. It fits your ₹1 lakh budget (₹65K–85K), pairs perfectly with your Havells GTi's 3kW battery port, 
+    and delivers real daily value — not just backup insurance. Look at Livguard LGSP48100 or Loom Solar 4.8kWh as top choices.</p>`;
+
+  } else if(kwh === 7.2) {
+    html = `<p>The <strong>7.2 kWh</strong> option gives you near-full night coverage — the battery covers <strong>${sim.battery_discharge.toFixed(1)} kWh</strong> of your 
+    evening load, reducing grid dependency to just <strong>${sim.new_grid_pct}%</strong>. That's impressive.</p>
+    <p>However, it's <strong>₹95K–1.1L</strong> — slightly over your ₹1 lakh budget — and the incremental savings over 4.8 kWh are modest. 
+    The breakeven stretches to <strong>${payback} years</strong>. Financially, the 4.8 kWh is a better investment unless extended power cuts (2+ hrs) are a regular issue.</p>
+    <p>💡 <strong>Verdict:</strong> A good choice IF you can stretch the budget. If your power cuts start increasing seasonally, this future-proofs you. 
+    Otherwise, stick with 4.8 kWh.</p>`;
+
+  } else if(kwh >= 9.6) {
+    html = `<p>The <strong>9.6 kWh</strong> option takes you to <strong>${sim.new_self_pct}% self-sufficiency</strong> — almost completely off the grid at night. 
+    Your grid import drops to just <strong>${sim.new_grid_import.toFixed(1)} kWh/day</strong>. It's impressive on paper.</p>
+    <p>But at <strong>₹1.25L–1.55L</strong>, it's well over budget, and the <strong>${payback}-year breakeven</strong> is very long for a battery that lasts ~9.5 years. 
+    You'd be replacing it before it fully pays back. The math doesn't work unless electricity tariffs spike dramatically.</p>
+    <p>💡 <strong>Verdict:</strong> Not recommended at current tariff levels. The 4.8 kWh delivers 80% of the benefit at 55% of the cost. 
+    Revisit 9.6 kWh only if your consumption grows significantly or MSEDCL tariffs hit ₹12+/unit.</p>`;
+
+  } else {
+    html = `<p>A <strong>${kwh.toFixed(1)} kWh custom capacity</strong> gives you <strong>${backup} hours backup</strong> and 
+    <strong>₹${annSave}/year</strong> in additional savings with a <strong>${payback}-year breakeven</strong>.</p>
+    <p>The standard 4.8 kWh (100Ah) pack is likely the closest commercial product to this size — check availability in India before committing.</p>`;
+  }
+
+  el.innerHTML = html;
+}
+
+// ─────────────────────────────────────────────
+//  Brands
+// ─────────────────────────────────────────────
+function renderBrands(kwh) {
+  const bat = SYSTEM.batteries.find(b => b.kwh === kwh);
+  const row = document.getElementById('brands-row');
+  const brands = bat ? bat.brands : ['Loom Solar', 'Livguard', 'Luminous', 'Genus'];
+  row.innerHTML = brands.map(b =>
+    `<div class="brand-tag">🔋 ${b}</div>`
+  ).join('');
+}
+</script>
+</body>
+</html>
