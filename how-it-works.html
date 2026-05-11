@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How the Math Works — Solar Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Exo+2:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    /* Page-specific overrides */
+    .flow-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 40px 0;
+      background: rgba(15, 23, 42, 0.4);
+      border: 1px solid rgba(148, 163, 184, 0.1);
+      border-radius: var(--r-xl);
+    }
+    
+    .explanation-card {
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid rgba(148, 163, 184, 0.15);
+      border-radius: var(--r-lg);
+      padding: 32px;
+      margin-bottom: 32px;
+    }
+
+    .explanation-card h3 {
+      font-family: var(--font-display);
+      color: var(--text-primary);
+      margin-bottom: 16px;
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .explanation-card p {
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 16px;
+      font-size: 16px;
+    }
+
+    .highlight-box {
+      background: rgba(16, 185, 129, 0.1);
+      border-left: 4px solid var(--battery-c);
+      padding: 16px 20px;
+      border-radius: 4px;
+      margin: 20px 0;
+    }
+
+    .highlight-box p {
+      margin: 0;
+      color: var(--text-primary);
+    }
+
+    /* SVG Animation specific */
+    @keyframes dash-flow {
+      to { stroke-dashoffset: -20; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════ NAVBAR ═══════════════════════════ -->
+<nav class="navbar">
+  <a href="index.html" class="nav-brand">
+    <div class="brand-icon">☀️</div>
+    <div>
+      <div class="brand-name">SolarHome</div>
+      <div class="brand-sub">Nashik · 5 kW System</div>
+    </div>
+  </a>
+  <ul class="nav-links">
+    <li><a href="index.html">Dashboard</a></li>
+    <li><a href="simulator.html">Battery Sim</a></li>
+    <li><a href="how-it-works.html" class="active">Math Explained</a></li>
+  </ul>
+  <div class="nav-badge">
+    <span class="dot"></span>
+    <span id="nav-live">MSEDCL Net Metering</span>
+  </div>
+</nav>
+
+<main>
+<section class="section" style="padding-top: 40px;">
+  <div class="section-header reveal">
+    <span class="section-tag">// decoding the calculations</span>
+    <h1 class="hero-title" style="font-size: 42px;">How the <span class="accent">Math</span> Works</h1>
+    <p class="hero-sub" style="max-width: 600px; margin: 0 auto;">Understanding MSEDCL Net Metering, Battery ROI, and why the grid is actually your biggest battery.</p>
+  </div>
+
+  <div class="explanation-card reveal" style="margin-top: 40px;">
+    <h3>🍅 The Tomato Analogy: Net Billing vs. Net Metering</h3>
+    <p>Imagine your solar panels are a garden that grows tomatoes (electricity), and the power grid (MSEDCL) is a local grocery store.</p>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px;">
+      <div style="background: rgba(239, 68, 68, 0.05); padding: 20px; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.2);">
+        <h4 style="color: #fca5a5; margin-bottom: 12px; font-family: var(--font-display);">❌ The Old Way: Net Billing</h4>
+        <p style="font-size: 14px;">During the day, you sell your extra tomatoes to the store for a wholesale price of <strong>₹2.8</strong> each. Later at night when you get hungry, you have to buy them back at the retail price of <strong>₹9.0</strong> each! You lose a lot of money on the difference.</p>
+      </div>
+      
+      <div style="background: rgba(16, 185, 129, 0.05); padding: 20px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.2);">
+        <h4 style="color: #6ee7b7; margin-bottom: 12px; font-family: var(--font-display);">✅ Reality: True Net Metering</h4>
+        <p style="font-size: 14px;">MSEDCL works like a <strong>Bank Vault</strong>. During the day, you put your extra tomatoes into the vault. At night, you walk into the vault and take your exact same tomatoes back out for <strong>FREE</strong> (a 1:1 swap). You only get paid ₹2.8 if you leave extra tomatoes in the vault for a whole year.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SVG Flow Diagram -->
+  <div class="flow-wrap reveal">
+    <h3 style="text-align: center; color: var(--text-primary); font-family: var(--font-display); margin-bottom: 30px;">The 1:1 Bank Vault Visualized</h3>
+    <svg viewBox="0 0 800 200" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto; overflow: visible;">
+      <defs>
+        <marker id="arr-day" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#f59e0b" opacity="0.8"/>
+        </marker>
+        <marker id="arr-night" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#3b82f6" opacity="0.8"/>
+        </marker>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+          <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      <!-- HOME NODE -->
+      <g transform="translate(200, 100)">
+        <circle r="45" fill="rgba(248,250,252,0.05)" stroke="rgba(248,250,252,0.2)" stroke-width="2"/>
+        <text text-anchor="middle" dominant-baseline="central" font-size="28" y="-2">🏠</text>
+        <text text-anchor="middle" y="65" font-size="12" fill="#94a3b8" font-family="Share Tech Mono" letter-spacing="1">YOUR HOME</text>
+      </g>
+
+      <!-- GRID/VAULT NODE -->
+      <g transform="translate(600, 100)">
+        <rect x="-45" y="-45" width="90" height="90" rx="12" fill="rgba(59,130,246,0.1)" stroke="#3b82f6" stroke-width="2" filter="url(#glow)"/>
+        <text text-anchor="middle" dominant-baseline="central" font-size="28" y="-2">🏦</text>
+        <text text-anchor="middle" y="65" font-size="12" fill="#94a3b8" font-family="Share Tech Mono" letter-spacing="1">MSEDCL VAULT</text>
+      </g>
+
+      <!-- DAY FLOW (Top curve) -->
+      <path d="M 235,70 Q 400,-20 565,70" stroke="#f59e0b" stroke-width="3" fill="none"
+            marker-end="url(#arr-day)" stroke-dasharray="8 4"
+            style="animation:dash-flow 1s linear infinite" opacity="0.8"/>
+      <rect x="330" y="8" width="140" height="24" rx="4" fill="#0f1929" stroke="rgba(245,158,11,0.3)"/>
+      <text x="400" y="24" text-anchor="middle" font-size="11" fill="#f59e0b" font-family="Share Tech Mono">DAY: Deposit Extra Units</text>
+
+      <!-- NIGHT FLOW (Bottom curve) -->
+      <path d="M 565,130 Q 400,220 235,130" stroke="#3b82f6" stroke-width="3" fill="none"
+            marker-end="url(#arr-night)" stroke-dasharray="8 4"
+            style="animation:dash-flow 1s linear infinite" opacity="0.8"/>
+      <rect x="320" y="168" width="160" height="24" rx="4" fill="#0f1929" stroke="rgba(59,130,246,0.3)"/>
+      <text x="400" y="184" text-anchor="middle" font-size="11" fill="#3b82f6" font-family="Share Tech Mono">NIGHT: Withdraw Free Units</text>
+
+    </svg>
+  </div>
+
+  <div class="explanation-card reveal">
+    <h3>🔋 Why is Battery ROI "N/A" (Backup Only)?</h3>
+    <p>Many solar sellers will try to convince you that buying a battery will save you money on your daily electric bill. Because of <strong>True Net Metering</strong>, this is mathematically false.</p>
+    
+    <div class="highlight-box">
+      <p><strong>The Reality:</strong> If the grid already gives you a free, 100% efficient way to store your daytime energy (the vault) and use it at night, buying an expensive ₹75,000 physical battery provides <strong>ZERO</strong> extra financial return on your daily bill.</p>
+    </div>
+
+    <p>If you buy a battery, it simply holds your extra daytime energy to use at night. But the grid was already doing that for you! Therefore, the physical battery doesn't actually save you any extra money over what the grid was already saving you.</p>
+
+    <h4 style="color: var(--text-primary); margin-top: 24px; margin-bottom: 12px; font-family: var(--font-display);">So why buy a battery at all?</h4>
+    <p>The only reason to buy a battery in a Net Metering setup is for <strong>Peace of Mind</strong>. If the grid goes down (a power cut), the "bank vault" is locked, and your on-grid solar system shuts down. A physical battery keeps your lights, fans, and Wi-Fi running during a blackout.</p>
+    
+    <div style="margin-top: 24px;">
+      <a href="simulator.html" class="btn btn-outline">Return to Battery Simulator →</a>
+    </div>
+  </div>
+
+</section>
+</main>
+
+<footer class="footer">
+  <p>⚡ Built for <strong>Nashik Home Solar</strong> · Accurate Math, No Nonsense</p>
+</footer>
+
+<script>
+  // Scroll Reveal
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if(e.isIntersecting) { e.target.classList.add('visible'); }
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>
