@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solar Dashboard — Nashik Home</title>
+  <meta name="description" content="5kW Havells Enviro GTi Solar System — Nashik, Maharashtra. Live stats, generation data, and battery simulator.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Exo+2:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    /* Page-specific overrides */
+    .energy-flow-wrap {
+      position:relative;
+      width:100%;
+      max-width:820px;
+      margin:0 auto 0;
+    }
+
+    /* Node boxes in flow diagram */
+    .flow-node {
+      position:absolute;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      pointer-events:none;
+    }
+
+    .node-circle {
+      width:72px;height:72px;
+      border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      font-size:28px;
+      border:2px solid;
+      position:relative;
+    }
+
+    .node-label {
+      font-size:11px;
+      letter-spacing:2px;
+      text-transform:uppercase;
+      color:var(--text-secondary);
+      font-family:var(--font-mono);
+      white-space:nowrap;
+    }
+
+    .node-val {
+      font-family:var(--font-display);
+      font-size:13px;
+      font-weight:700;
+      white-space:nowrap;
+    }
+
+    /* Animated glow rings */
+    .node-circle.sun {
+      background:rgba(245,158,11,0.15);
+      border-color:var(--solar);
+      box-shadow:0 0 32px var(--solar-glow), 0 0 64px rgba(245,158,11,0.15);
+      animation:pulse-solar 2.5s ease-in-out infinite;
+    }
+
+    .node-circle.panels {
+      background:rgba(245,158,11,0.08);
+      border-color:rgba(245,158,11,0.5);
+    }
+
+    .node-circle.inverter {
+      background:rgba(248,250,252,0.06);
+      border-color:rgba(248,250,252,0.3);
+    }
+
+    .node-circle.home {
+      background:rgba(248,250,252,0.06);
+      border-color:rgba(248,250,252,0.25);
+    }
+
+    .node-circle.battery {
+      background:var(--battery-dim);
+      border-color:var(--battery-c);
+      box-shadow:0 0 20px var(--battery-glow);
+      animation:pulse-battery 3s ease-in-out infinite;
+    }
+
+    .node-circle.grid {
+      background:var(--grid-dim);
+      border-color:var(--grid-c);
+    }
+
+    @keyframes pulse-battery {
+      0%,100% { box-shadow:0 0 20px var(--battery-glow); }
+      50%      { box-shadow:0 0 40px var(--battery-glow),0 0 60px rgba(16,185,129,0.1); }
+    }
+
+    /* Monthly chart container */
+    #monthlyChart { max-height:260px; }
+
+    /* ROI timeline visual */
+    .roi-timeline {
+      display:flex;
+      gap:0;
+      margin-top:24px;
+      border-radius:8px;
+      overflow:hidden;
+      height:48px;
+    }
+
+    .roi-seg {
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:11px;
+      font-family:var(--font-mono);
+      transition:flex 0.8s ease;
+      overflow:hidden;
+      white-space:nowrap;
+    }
+
+    .roi-seg.investment { background:rgba(239,68,68,0.25); color:#fca5a5; flex:1; }
+    .roi-seg.recovering { background:rgba(245,158,11,0.2); color:var(--solar); flex:1; }
+    .roi-seg.profit     { background:rgba(16,185,129,0.2); color:var(--battery-c); flex:1; }
+
+    /* Stat highlight row */
+    .highlight-strip {
+      background:linear-gradient(135deg,rgba(245,158,11,0.06),rgba(245,158,11,0));
+      border:1px solid rgba(245,158,11,0.15);
+      border-radius:var(--r-lg);
+      padding:28px 36px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      flex-wrap:wrap;
+      gap:24px;
+      margin-bottom:40px;
+    }
+
+    .hs-item {
+      text-align:center;
+      min-width:100px;
+    }
+
+    .hs-val {
+      font-family:var(--font-display);
+      font-size:28px;
+      font-weight:700;
+      color:var(--solar);
+      display:block;
+      line-height:1;
+    }
+
+    .hs-lbl {
+      font-size:11px;
+      color:var(--text-muted);
+      letter-spacing:1.5px;
+      text-transform:uppercase;
+      margin-top:6px;
+      display:block;
+    }
+
+    .hs-divider {
+      width:1px; height:40px;
+      background:var(--border-bright);
+    }
+
+    /* CTA section */
+    .cta-section {
+      background:linear-gradient(135deg,rgba(16,185,129,0.06),rgba(6,10,20,0));
+      border:1px solid var(--battery-glow);
+      border-radius:var(--r-xl);
+      padding:64px 48px;
+      text-align:center;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .cta-section::before {
+      content:'';
+      position:absolute;
+      bottom:-60px;right:-60px;
+      width:200px;height:200px;
+      border-radius:50%;
+      background:radial-gradient(circle, var(--battery-glow),transparent 70%);
+      pointer-events:none;
+    }
+
+    .cta-section h2 {
+      font-family:var(--font-display);
+      font-size:clamp(22px,3vw,36px);
+      font-weight:700;
+      margin-bottom:12px;
+    }
+
+    .cta-section p {
+      color:var(--text-secondary);
+      max-width:480px;
+      margin:0 auto 32px;
+      font-size:15px;
+    }
+
+    /* System info grid */
+    .sysinfo-cols {
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:20px;
+    }
+    @media(max-width:640px){ .sysinfo-cols { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════ NAVBAR ═══════════════════════════ -->
+<nav class="navbar">
+  <a href="index.html" class="nav-brand">
+    <div class="brand-icon">☀️</div>
+    <div>
+      <div class="brand-name">SolarHome</div>
+      <div class="brand-sub">Nashik · 5 kW System</div>
+    </div>
+  </a>
+  <ul class="nav-links">
+    <li><a href="index.html" class="active">Dashboard</a></li>
+    <li><a href="simulator.html">Battery Sim</a></li>
+  </ul>
+  <div class="nav-badge">
+    <span class="dot"></span>
+    <span id="nav-live">20.8 kWh avg/day</span>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════ HERO ═══════════════════════════ -->
+<main>
+<section class="hero">
+  <div class="hero-label">☀ Nashik · Maharashtra · 5kW System</div>
+  <h1 class="hero-title">Your Home's <span class="accent">Solar</span><br>Command Center</h1>
+  <p class="hero-sub">Havells Enviro GTi Hybrid · Net Metering Active · April 2026 Live Data</p>
+
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <span class="val" id="hero-gen">20.8</span>
+      <span class="lbl">kWh/Day Avg</span>
+    </div>
+    <div class="hero-divider"></div>
+    <div class="hero-stat">
+      <span class="val" id="hero-month">623</span>
+      <span class="lbl">kWh This Month</span>
+    </div>
+    <div class="hero-divider"></div>
+    <div class="hero-stat">
+      <span class="val" id="hero-co2">186</span>
+      <span class="lbl">kg CO₂ Saved</span>
+    </div>
+    <div class="hero-divider"></div>
+    <div class="hero-stat">
+      <span class="val" id="hero-export">₹225</span>
+      <span class="lbl">Export Credit</span>
+    </div>
+  </div>
+
+  <!-- Energy Flow SVG Diagram -->
+  <div class="energy-flow-wrap reveal">
+    <svg viewBox="0 0 820 280" xmlns="http://www.w3.org/2000/svg" class="flow-svg" style="overflow:visible">
+      <defs>
+        <marker id="arr-solar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#f59e0b" opacity="0.8"/>
+        </marker>
+        <marker id="arr-bat" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#10b981" opacity="0.8"/>
+        </marker>
+        <marker id="arr-grid" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#3b82f6" opacity="0.8"/>
+        </marker>
+        <filter id="glow-f">
+          <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+          <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      <!-- ── SUN (left) ── -->
+      <g transform="translate(80,140)">
+        <circle r="44" fill="rgba(245,158,11,0.12)" stroke="#f59e0b" stroke-width="1.5" filter="url(#glow-f)"/>
+        <circle r="32" fill="rgba(245,158,11,0.2)" stroke="#f59e0b" stroke-width="1"/>
+        <text text-anchor="middle" dominant-baseline="central" font-size="22" y="-2">☀️</text>
+        <text text-anchor="middle" y="62" font-size="10" fill="#94a3b8" font-family="Share Tech Mono" letter-spacing="1">SUN</text>
+      </g>
+
+      <!-- ── SOLAR PANELS (center-top) ── -->
+      <g transform="translate(280,80)">
+        <!-- Panel grid icon -->
+        <rect x="-36" y="-28" width="72" height="56" rx="6" fill="rgba(245,158,11,0.08)" stroke="rgba(245,158,11,0.4)" stroke-width="1.5"/>
+        <line x1="-36" y1="-28" x2="-36" y2="28" stroke="rgba(245,158,11,0.3)" stroke-width="1"/>
+        <line x1="0"   y1="-28" x2="0"   y2="28" stroke="rgba(245,158,11,0.3)" stroke-width="1"/>
+        <line x1="36"  y1="-28" x2="36"  y2="28" stroke="rgba(245,158,11,0.3)" stroke-width="1"/>
+        <line x1="-36" y1="0"   x2="36"  y2="0"  stroke="rgba(245,158,11,0.3)" stroke-width="1"/>
+        <text text-anchor="middle" y="46" font-size="10" fill="#94a3b8" font-family="Share Tech Mono" letter-spacing="1">5 kW PANELS</text>
+        <text text-anchor="middle" y="60" font-size="11" fill="#f59e0b" font-family="Orbitron" font-weight="700">~20.8 kWh/day</text>
+      </g>
+
+      <!-- ── INVERTER (center) ── -->
+      <g transform="translate(420,170)">
+        <rect x="-40" y="-32" width="80" height="64" rx="8" fill="rgba(248,250,252,0.05)" stroke="rgba(248,250,252,0.25)" stroke-width="1.5"/>
+        <text text-anchor="middle" dominant-baseline="central" font-size="20" y="-4">⚡</text>
+        <text text-anchor="middle" y="20" font-size="8" fill="#94a3b8" font-family="Share Tech Mono">INVERTER</text>
+        <text text-anchor="middle" y="50" font-size="9" fill="#94a3b8" font-family="Share Tech Mono">Havells GTi</text>
+      </g>
+
+      <!-- ── HOME (right) ── -->
+      <g transform="translate(620,100)">
+        <circle r="38" fill="rgba(248,250,252,0.05)" stroke="rgba(248,250,252,0.2)" stroke-width="1.5"/>
+        <text text-anchor="middle" dominant-baseline="central" font-size="22" y="-2">🏠</text>
+        <text text-anchor="middle" y="56" font-size="10" fill="#94a3b8" font-family="Share Tech Mono" letter-spacing="1">HOME</text>
+        <text text-anchor="middle" y="70" font-size="11" fill="#f1f5f9" font-family="Orbitron" font-weight="700">13 kWh/day</text>
+      </g>
+
+      <!-- ── BATTERY (bottom-center) ── -->
+      <g transform="translate(420,260)">
+        <rect x="-36" y="-24" width="72" height="48" rx="6" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="1.5" filter="url(#glow-f)"/>
+        <rect x="32"  y="-10" width="8"  height="20" rx="2" fill="#10b981" opacity="0.6"/>
+        <text text-anchor="middle" dominant-baseline="central" font-size="16" y="-2">🔋</text>
+        <text text-anchor="middle" y="36" font-size="10" fill="#94a3b8" font-family="Share Tech Mono" letter-spacing="1">BATTERY</text>
+      </g>
+
+      <!-- ── GRID (bottom-right) ── -->
+      <g transform="translate(660,240)">
+        <circle r="34" fill="rgba(59,130,246,0.08)" stroke="rgba(59,130,246,0.5)" stroke-width="1.5"/>
+        <text text-anchor="middle" dominant-baseline="central" font-size="18" y="-2">🔌</text>
+        <text text-anchor="middle" y="50" font-size="10" fill="#94a3b8" font-family="Share Tech Mono" letter-spacing="1">GRID</text>
+        <text text-anchor="middle" y="64" font-size="11" fill="#3b82f6" font-family="Orbitron" font-weight="700">₹2.8/unit</text>
+      </g>
+
+      <!-- ══ FLOW LINES ══ -->
+
+      <!-- Sun → Panels -->
+      <path d="M 125,140 Q 180,100 242,80" stroke="#f59e0b" stroke-width="2" fill="none"
+            marker-end="url(#arr-solar)" stroke-dasharray="8 4"
+            style="animation:flow-dash 1.2s linear infinite" opacity="0.7"/>
+
+      <!-- Panels → Inverter -->
+      <path d="M 280,108 L 380,160" stroke="#f59e0b" stroke-width="2" fill="none"
+            marker-end="url(#arr-solar)" stroke-dasharray="8 4"
+            style="animation:flow-dash 1.2s linear infinite 0.2s" opacity="0.7"/>
+
+      <!-- Inverter → Home -->
+      <path d="M 460,155 Q 530,125 582,108" stroke="#f59e0b" stroke-width="2.5" fill="none"
+            marker-end="url(#arr-solar)" stroke-dasharray="8 4"
+            style="animation:flow-dash 1.0s linear infinite" opacity="0.85"/>
+
+      <!-- Inverter → Battery (charging) -->
+      <path d="M 420,202 L 420,236" stroke="#10b981" stroke-width="2" fill="none"
+            marker-end="url(#arr-bat)" stroke-dasharray="6 4"
+            style="animation:flow-dash 1.5s linear infinite" opacity="0.8"/>
+
+      <!-- Battery → Home (discharging arrow, dashed reverse) -->
+      <path d="M 456,255 Q 540,230 582,120" stroke="#10b981" stroke-width="1.5" fill="none"
+            stroke-dasharray="5 5" opacity="0.4"/>
+
+      <!-- Home → Grid (export) -->
+      <path d="M 658,108 Q 690,150 660,206" stroke="#3b82f6" stroke-width="1.5" fill="none"
+            marker-end="url(#arr-grid)" stroke-dasharray="6 4"
+            style="animation:flow-dash 2s linear infinite" opacity="0.7"/>
+
+      <!-- Grid → Home (import, reverse dashed) -->
+      <path d="M 650,215 Q 670,160 660,120" stroke="#3b82f6" stroke-width="1" fill="none"
+            stroke-dasharray="4 6" opacity="0.3"/>
+
+      <!-- Flow labels -->
+      <text x="165" y="104" font-size="10" fill="#f59e0b" font-family="Share Tech Mono" opacity="0.8">5kW peak</text>
+      <text x="493" y="146" font-size="10" fill="#f59e0b" font-family="Share Tech Mono" opacity="0.8">self-use</text>
+      <text x="400" y="226" font-size="10" fill="#10b981" font-family="Share Tech Mono" opacity="0.8">charge</text>
+      <text x="685" y="165" font-size="10" fill="#3b82f6" font-family="Share Tech Mono" opacity="0.7">export</text>
+    </svg>
+  </div>
+
+  <div style="margin-top:32px;opacity:0;animation:fade-up 0.8s ease forwards 1.2s">
+    <a href="simulator.html" class="btn btn-primary">🔋 Simulate a Battery</a>
+    <a href="#stats" class="btn btn-outline" style="margin-left:12px">View Stats ↓</a>
+  </div>
+</section>
+
+<!-- ═════════════════════════ STATS SECTION ════════════════════════ -->
+<div class="divider"></div>
+<section class="section" id="stats">
+  <div class="section-header reveal">
+    <span class="section-tag">// system performance</span>
+    <h2 class="section-title">April 2026 <span>Snapshot</span></h2>
+    <p class="section-desc">Real data from your Solarman Smart app — April 2026 was your best month on record.</p>
+  </div>
+
+  <!-- Highlight strip -->
+  <div class="highlight-strip reveal">
+    <div class="hs-item">
+      <span class="hs-val">623</span>
+      <span class="hs-lbl">kWh Generated</span>
+    </div>
+    <div class="hs-divider"></div>
+    <div class="hs-item">
+      <span class="hs-val">20.8</span>
+      <span class="hs-lbl">kWh / Day Avg</span>
+    </div>
+    <div class="hs-divider"></div>
+    <div class="hs-item">
+      <span class="hs-val">₹225</span>
+      <span class="hs-lbl">Export Credit</span>
+    </div>
+    <div class="hs-divider"></div>
+    <div class="hs-item">
+      <span class="hs-val" id="hs-co2">511</span>
+      <span class="hs-lbl">kg CO₂ Avoided</span>
+    </div>
+    <div class="hs-divider"></div>
+    <div class="hs-item">
+      <span class="hs-val" id="hs-saved">₹3,240</span>
+      <span class="hs-lbl">Est. Bill Saved</span>
+    </div>
+  </div>
+
+  <!-- 4 stat cards -->
+  <div class="cards-grid stagger reveal">
+    <div class="card solar">
+      <div class="card-icon">☀️</div>
+      <div class="card-label">Daily Generation</div>
+      <div class="card-value">20.8 <span class="unit">kWh</span></div>
+      <div class="card-sub">Peak days hit 24+ kWh in April</div>
+      <div class="card-trend up">+↑ Summer peak</div>
+    </div>
+
+    <div class="card grid">
+      <div class="card-icon">🏠</div>
+      <div class="card-label">Daily Consumption</div>
+      <div class="card-value">13 <span class="unit">kWh</span></div>
+      <div class="card-sub">ACs, pumps, appliances spread through day</div>
+    </div>
+
+    <div class="card battery">
+      <div class="card-icon">📤</div>
+      <div class="card-label">Daily Net Export</div>
+      <div class="card-value" id="card-export">7.5 <span class="unit">kWh</span></div>
+      <div class="card-sub">Fed to MSEDCL grid @ ₹2.8/unit</div>
+      <div class="card-trend up">₹21/day credit</div>
+    </div>
+
+    <div class="card export">
+      <div class="card-icon">💸</div>
+      <div class="card-label">Grid Import (Night)</div>
+      <div class="card-value" id="card-import">7.5 <span class="unit">kWh</span></div>
+      <div class="card-sub">Evening & night load from MSEDCL</div>
+      <div class="card-trend down">₹67.5/day</div>
+    </div>
+  </div>
+
+  <!-- Monthly chart -->
+  <div class="chart-card reveal">
+    <div class="chart-card-header">
+      <div class="chart-title">Monthly Generation Estimate</div>
+      <div class="chart-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--solar)"></div> Generation kWh/day</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--grid-c)"></div> Consumption 13 kWh/day</div>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="monthlyChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Self-sufficiency progress bars -->
+  <div class="chart-card reveal">
+    <div class="chart-card-header">
+      <div class="chart-title">Energy Independence (Without Battery)</div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-header">
+        <span class="progress-label">Solar Self-Consumption (Daytime)</span>
+        <span class="progress-pct" id="pct-self">42%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="fill-self" style="background:var(--solar);width:0%"></div>
+      </div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-header">
+        <span class="progress-label">Grid Dependency (Night Import)</span>
+        <span class="progress-pct" id="pct-grid">58%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="fill-grid" style="background:var(--grid-c);width:0%"></div>
+      </div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-header">
+        <span class="progress-label">Surplus Exported to Grid</span>
+        <span class="progress-pct" id="pct-export">58%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="fill-export" style="background:var(--export-c);width:0%"></div>
+      </div>
+    </div>
+    <p style="font-size:13px;color:var(--text-muted);margin-top:16px">
+      💡 Adding a battery can raise self-sufficiency to <strong style="color:var(--battery-c)">70–85%</strong> — 
+      <a href="simulator.html" style="color:var(--solar);text-decoration:none">run the battery simulator →</a>
+    </p>
+  </div>
+</section>
+
+<!-- ═════════════════════════ SYSTEM INFO ════════════════════════ -->
+<div class="divider"></div>
+<section class="section reveal" id="system">
+  <div class="section-header">
+    <span class="section-tag">// hardware & tariffs</span>
+    <h2 class="section-title">Your <span>System</span></h2>
+    <p class="section-desc">Complete specifications for your Nashik solar installation.</p>
+  </div>
+
+  <div class="sysinfo-cols stagger reveal">
+    <div>
+      <div class="spec-grid">
+        <div class="spec-row"><span class="spec-key">Inverter</span><span class="spec-val">Havells Enviro GTi Hybrid <span class="tag">Hybrid</span></span></div>
+        <div class="spec-row"><span class="spec-key">Capacity</span><span class="spec-val">5 kW</span></div>
+        <div class="spec-row"><span class="spec-key">Battery Port</span><span class="spec-val">48V · 3kW max</span></div>
+        <div class="spec-row"><span class="spec-key">Battery Chemistry</span><span class="spec-val">LiFePO4 Ready</span></div>
+        <div class="spec-row"><span class="spec-key">Serial No.</span><span class="spec-val">SH3ES450R64129</span></div>
+        <div class="spec-row"><span class="spec-key">Manufactured</span><span class="spec-val">June 2025</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="spec-grid">
+        <div class="spec-row"><span class="spec-key">Grid Type</span><span class="spec-val">On-Grid + Net Metering</span></div>
+        <div class="spec-row"><span class="spec-key">DISCOM</span><span class="spec-val">MSEDCL</span></div>
+        <div class="spec-row"><span class="spec-key">Grid Tariff</span><span class="spec-val">₹9 / unit (est.)</span></div>
+        <div class="spec-row"><span class="spec-key">Export Rate</span><span class="spec-val">₹2.8 / unit</span></div>
+        <div class="spec-row"><span class="spec-key">Install Cost</span><span class="spec-val">₹3,00,000</span></div>
+        <div class="spec-row"><span class="spec-key">Monitoring</span><span class="spec-val">Solarman Smart App</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════════════════ ROI SECTION ════════════════════════ -->
+<div class="divider"></div>
+<section class="section" id="roi">
+  <div class="section-header reveal">
+    <span class="section-tag">// return on investment</span>
+    <h2 class="section-title">Solar System <span>ROI</span></h2>
+    <p class="section-desc">Your ₹3 lakh solar investment — how it's paying back over time.</p>
+  </div>
+
+  <div class="cards-grid stagger reveal" style="grid-template-columns:repeat(3,1fr)">
+    <div class="roi-card card solar">
+      <div class="roi-label">Annual Savings</div>
+      <div class="roi-big" id="roi-annual">₹40K</div>
+      <div class="roi-sub">vs paying full grid tariff</div>
+    </div>
+    <div class="roi-card card battery">
+      <div class="roi-label">Payback Period</div>
+      <div class="roi-big" id="roi-payback">7.5 yrs</div>
+      <div class="roi-sub">solar system on ₹3 Lakhs</div>
+    </div>
+    <div class="roi-card card export">
+      <div class="roi-label">25-Year Lifetime Saving</div>
+      <div class="roi-big" id="roi-lifetime">₹10L+</div>
+      <div class="roi-sub">estimated at 5% tariff hike/yr</div>
+    </div>
+  </div>
+
+  <!-- ROI Timeline -->
+  <div class="chart-card reveal" style="margin-top:24px">
+    <div class="chart-card-header">
+      <div class="chart-title">10-Year Cash Flow Projection</div>
+      <div class="chart-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(239,68,68,0.5)"></div> In debt</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--battery-c)"></div> In profit</div>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="cashflowChart"></canvas>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════════════════ CTA ════════════════════════ -->
+<div class="divider"></div>
+<section class="section-sm reveal">
+  <div class="cta-section">
+    <h2>🔋 Should You Add a Battery?</h2>
+    <p>Use the interactive simulator to compare 2.4–9.6 kWh options. See exact backup hours, savings, and breakeven — all calculated for your system.</p>
+    <a href="simulator.html" class="btn btn-primary">Open Battery Simulator →</a>
+  </div>
+</section>
+
+<!-- ═════════════════════════ FOOTER ════════════════════════ -->
+<footer class="footer">
+  <p>⚡ Built for <strong>Nashik Home Solar</strong> · Havells Enviro GTi Hybrid 5kW · Data from Solarman Smart</p>
+  <p style="margin-top:8px;font-size:12px">All calculations are estimates based on Nashik solar irradiance and provided tariff data. Actual results may vary.</p>
+</footer>
+
+<!-- ═══════════════════════════ SCRIPTS ══════════════════════════ -->
+<script src="js/data.js"></script>
+<script src="js/calculations.js"></script>
+<script>
+// ── Populate calculated values ───────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const base = CALC.calcBaseline();
+
+  // Hero exports
+  document.getElementById('hero-co2').textContent  = Math.round(base.annual_gen / 12 * SYSTEM.co2_per_kwh_kg);
+  document.getElementById('hero-export').textContent = '₹' + Math.round(SYSTEM.april_2026.estimated_revenue_inr);
+
+  // April CO₂
+  const aprilCo2 = Math.round(SYSTEM.april_2026.monthly_kwh * SYSTEM.co2_per_kwh_kg);
+  document.getElementById('hs-co2').textContent = aprilCo2;
+
+  // April estimated bill saved (generation × self-use portion × tariff)
+  const aprilSaved = Math.round((SYSTEM.april_2026.daily_avg_kwh * SYSTEM.solar_hour_fraction) * 30 * SYSTEM.grid_tariff_inr);
+  document.getElementById('hs-saved').textContent = '₹' + aprilSaved.toLocaleString('en-IN');
+
+  // Cards
+  document.getElementById('card-export').innerHTML = base.surplus.toFixed(1) + ' <span class="unit">kWh</span>';
+  document.getElementById('card-import').innerHTML = base.night_load.toFixed(1) + ' <span class="unit">kWh</span>';
+
+  // Progress bars
+  const selfPct   = Math.round(base.self_sufficiency_pct);
+  const gridPct   = Math.round(base.grid_dependency_pct);
+  const expPct    = Math.round((base.surplus / base.gen) * 100);
+
+  document.getElementById('pct-self').textContent   = selfPct + '%';
+  document.getElementById('pct-grid').textContent   = gridPct + '%';
+  document.getElementById('pct-export').textContent = expPct + '%';
+
+  setTimeout(() => {
+    document.getElementById('fill-self').style.width   = selfPct + '%';
+    document.getElementById('fill-grid').style.width   = gridPct + '%';
+    document.getElementById('fill-export').style.width = expPct + '%';
+  }, 600);
+
+  // ROI
+  const annualSaving = base.daily_savings_vs_nogrid * 365;
+  const paybackYrs   = SYSTEM.install_cost_inr / annualSaving;
+  // 25-year with 5% hike
+  let lifetime = 0, s = annualSaving;
+  for(let i=0;i<25;i++){ lifetime += s; s*=1.05; }
+
+  document.getElementById('roi-annual').textContent  = '₹' + Math.round(annualSaving/1000) + 'K';
+  document.getElementById('roi-payback').textContent = paybackYrs.toFixed(1) + ' yrs';
+  document.getElementById('roi-lifetime').textContent = '₹' + (lifetime/100000).toFixed(1) + 'L';
+
+  // ── Monthly Generation Chart ─────────────────────────────
+  const ctx1 = document.getElementById('monthlyChart').getContext('2d');
+  new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels: SYSTEM.months,
+      datasets: [
+        {
+          label: 'Generation (kWh/day)',
+          data: SYSTEM.monthly_daily_avg,
+          backgroundColor: SYSTEM.monthly_daily_avg.map(v =>
+            v === Math.max(...SYSTEM.monthly_daily_avg) ? 'rgba(245,158,11,0.9)' : 'rgba(245,158,11,0.5)'
+          ),
+          borderColor: 'rgba(245,158,11,0.8)',
+          borderWidth: 1,
+          borderRadius: 4,
+          borderSkipped: false,
+        },
+        {
+          label: 'Daily Consumption (kWh)',
+          data: Array(12).fill(SYSTEM.daily_consumption_kwh),
+          type: 'line',
+          borderColor: 'rgba(59,130,246,0.7)',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          borderDash: [6,3],
+          pointRadius: 0,
+          tension: 0,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0f1929',
+          borderColor: 'rgba(148,163,184,0.2)',
+          borderWidth: 1,
+          titleColor: '#f1f5f9',
+          bodyColor: '#94a3b8',
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)} kWh`
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(148,163,184,0.06)' },
+          ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 11 } }
+        },
+        y: {
+          grid: { color: 'rgba(148,163,184,0.06)' },
+          ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 11 }, callback: v => v + ' kWh' },
+          beginAtZero: true, max: 26,
+        }
+      }
+    }
+  });
+
+  // ── Cash Flow Chart ──────────────────────────────────────
+  const ctx2 = document.getElementById('cashflowChart').getContext('2d');
+  const years = [];
+  const cums  = [];
+  let cum = -SYSTEM.install_cost_inr;
+  let ann = annualSaving;
+  for(let i=0;i<=10;i++){
+    years.push('Year ' + i);
+    cums.push(Math.round(cum/1000));
+    cum += ann;
+    ann *= 1.05;
+  }
+
+  new Chart(ctx2, {
+    type: 'line',
+    data: {
+      labels: years,
+      datasets: [{
+        label: 'Cumulative Returns (₹K)',
+        data: cums,
+        borderColor: ctx => {
+          const v = ctx.chart.data.datasets[0].data;
+          return 'rgba(245,158,11,0.8)';
+        },
+        backgroundColor: (context) => {
+          const chart = context.chart;
+          const {ctx: c, chartArea} = chart;
+          if (!chartArea) return 'transparent';
+          const grad = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          grad.addColorStop(0, 'rgba(16,185,129,0.15)');
+          grad.addColorStop(0.5, 'rgba(245,158,11,0.08)');
+          grad.addColorStop(1, 'rgba(239,68,68,0.12)');
+          return grad;
+        },
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: cums.map(v => v >= 0 ? '#10b981' : '#ef4444'),
+        pointRadius: 5,
+        pointHoverRadius: 8,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0f1929',
+          borderColor: 'rgba(148,163,184,0.2)',
+          borderWidth: 1,
+          titleColor: '#f1f5f9',
+          bodyColor: '#94a3b8',
+          callbacks: {
+            label: ctx => {
+              const v = ctx.parsed.y;
+              return `${v >= 0 ? 'Net Profit' : 'Net Cost'}: ₹${Math.abs(v)}K`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(148,163,184,0.06)' },
+          ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 11 } }
+        },
+        y: {
+          grid: { color: 'rgba(148,163,184,0.06)' },
+          ticks: {
+            color: '#64748b',
+            font: { family: 'Share Tech Mono', size: 11 },
+            callback: v => (v >= 0 ? '+' : '') + '₹' + v + 'K'
+          },
+        }
+      }
+    }
+  });
+
+  // ── Scroll Reveal ────────────────────────────────────────
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if(e.isIntersecting) { e.target.classList.add('visible'); }
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+  // Animated number counters for hero
+  animateCounter('hero-gen',   0, 20.8, 1200, 1);
+  animateCounter('hero-month', 0, 623,  1500, 0);
+});
+
+function animateCounter(id, from, to, duration, decimals) {
+  const el = document.getElementById(id);
+  if(!el) return;
+  const start = performance.now();
+  function tick(now) {
+    const p = Math.min((now - start) / duration, 1);
+    const ease = 1 - Math.pow(1 - p, 3);
+    const v = from + (to - from) * ease;
+    el.textContent = decimals > 0 ? v.toFixed(decimals) : Math.round(v);
+    if(p < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+</script>
+</body>
+</html>
