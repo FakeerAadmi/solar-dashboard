@@ -8,7 +8,7 @@ const fmt = {
   inr:   v => `₹${Math.round(v).toLocaleString('en-IN')}`,
   kwh:   v => `${v.toFixed(1)} kWh`,
   pct:   v => `${Math.round(v)}%`,
-  yrs:   v => v >= 1 ? `${v.toFixed(1)} yrs` : `${Math.round(v*12)} mo`,
+  yrs:   v => !isFinite(v) ? "N/A (Backup Only)" : v >= 1 ? `${v.toFixed(1)} yrs` : `${Math.round(v*12)} mo`,
   dec1:  v => v.toFixed(1),
   dec2:  v => v.toFixed(2),
   int:   v => Math.round(v).toLocaleString('en-IN'),
@@ -25,11 +25,16 @@ function calcBaseline(dailyGenKwh = null) {
   const surplus       = gen - direct_solar;                        // goes to grid (export)
   const night_load    = cons - direct_solar;                       // needs grid at night
 
-  const daily_savings_vs_nogrid = (direct_solar * SYSTEM.grid_tariff_inr)
-                                + (surplus      * SYSTEM.export_rate_inr);
-  const daily_grid_cost  = night_load * SYSTEM.grid_tariff_inr;
-  const daily_export_rev = surplus    * SYSTEM.export_rate_inr;
+  // True 1:1 Net Metering: Grid offsets units perfectly before billing
+  const net_import_kwh = Math.max(0, cons - gen);
+  const net_surplus_kwh = Math.max(0, gen - cons);
+
+  const daily_grid_cost  = net_import_kwh * SYSTEM.grid_tariff_inr;
+  const daily_export_rev = net_surplus_kwh * SYSTEM.export_rate_inr;
   const daily_net_bill   = daily_grid_cost - daily_export_rev;     // net you pay to grid
+
+  const daily_without_solar_cost = cons * SYSTEM.grid_tariff_inr;
+  const daily_savings_vs_nogrid = daily_without_solar_cost - daily_net_bill;
 
   return {
     gen, cons, daytime_load, direct_solar,
@@ -73,14 +78,16 @@ function calcBattery(batteryKwh, dailyGenKwh = null) {
   const new_grid_import  = night_load  - battery_discharge;  // reduced grid at night
   const new_export       = surplus     - battery_charged;     // reduced export
 
-  // Financial deltas
-  const daily_grid_saving  = battery_discharge * SYSTEM.grid_tariff_inr;
-  const daily_export_loss  = battery_charged   * SYSTEM.export_rate_inr;
-  const daily_net_saving   = daily_grid_saving - daily_export_loss;
-  const annual_net_saving  = daily_net_saving  * 365;
+  // Financial deltas (True Net Metering)
+  // Because the grid gives you 1:1 net metering, shifting units locally via battery 
+  // provides ZERO additional financial savings compared to using the grid as your battery.
+  const daily_grid_saving  = 0;
+  const daily_export_loss  = 0;
+  const daily_net_saving   = 0;
+  const annual_net_saving  = 0;
 
   // Payback
-  const breakeven_yrs = bat.price_mid / annual_net_saving;
+  const breakeven_yrs = Infinity; // Battery is for backup comfort, not ROI
 
   // Backup duration (avg household load)
   const avg_load_kw = SYSTEM.daily_consumption_kwh / 24;  // ≈0.54 kW
